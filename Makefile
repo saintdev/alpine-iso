@@ -16,7 +16,8 @@ SUDO		= sudo
 TAR		= busybox tar
 APK_SEARCH	= apk search --exact
 
-ISO		?= $(ALPINE_NAME)-$(ALPINE_RELEASE)-$(ALPINE_ARCH).iso
+BUILD_ID	:= $(ALPINE_NAME)-$(ALPINE_RELEASE)-$(ALPINE_ARCH)
+ISO		?= $(BUILD_ID).iso
 ISO_LINK	?= $(ALPINE_NAME).iso
 ISO_DIR		:= $(DESTDIR)/isofs
 ISO_PKGDIR	:= $(ISO_DIR)/apks/$(ALPINE_ARCH)
@@ -46,7 +47,7 @@ help:
 	@echo "APKOVL:         $(APKOVL)"
 	@echo
 
-clean: clean-modloop clean-initfs
+clean: clean-modloop clean-initfs clean-rootsqfs
 	rm -rf $(ISO_DIR) $(ISO_REPOS_DIRSTAMP) $(ISOFS_DIRSTAMP) \
 		$(ALL_ISO_KERNEL)
 
@@ -161,6 +162,39 @@ clean-initfs-%:
 
 clean-initfs: $(addprefix clean-initfs-,$(KERNEL_FLAVOR))
 
+ROOTSQFS	:= $(ISO_DIR)/boot/$(BUILD_ID).sqfs
+ROOTSQFS_DIR	 = $(DESTDIR)/rootsqfs.$(PROFILE)
+ROOTSQFS_DIRSTAMP := $(DESTDIR)/stamp.rootsqfs.$(PROFILE)
+ROOTSQFS_PKGS	:= alpine-base acct mdadm $(shell sed -e 's/\#.*//' ${PROFILE}.packages | xargs echo)
+
+# rootsqfs-%: $(ROOTSQFS)
+# 	@:
+
+# ALL_ROOTSQFS = $(foreach flavor,$(PROFILE),$(subst %,$(flavor),$(ROOTSQFS)))
+
+rootsqfs: $(ROOTSQFS)
+
+$(ROOTSQFS_DIRSTAMP): $(PROFILE).packages
+	@rm -rf $(ROOTSQFS_DIR)
+	@mkdir -p $(ROOTSQFS_DIR)
+	@apk add $(APK_OPTS) \
+		--initdb \
+		--update \
+		--no-script \
+		--root $(ROOTSQFS_DIR) \
+		$(ROOTSQFS_PKGS)
+	@touch $@
+
+$(ROOTSQFS): $(ROOTSQFS_DIRSTAMP)
+	@echo "==> rootsqfs: building image $(notdir $@)"
+	@mkdir -p $(dir $@)
+	@$(MKSQUASHFS) $(ROOTSQFS_DIR) $@ -comp xz
+
+clean-rootsqfs-%:
+	@rm -rf $(ROOTSQFS) $(ROOTSQFS_DIRSTAMP) $(ROOTSQFS_DIR)
+
+clean-rootsqfs: $(addprefix clean-rootsqfs-,$(PROFILE))
+
 #
 # apkovl rules
 #
@@ -268,23 +302,23 @@ ISO_KERNEL	= $(ISO_DIR)/boot/$*
 ISO_REPOS_DIRSTAMP := $(DESTDIR)/stamp.isorepos
 ISOFS_DIRSTAMP	:= $(DESTDIR)/stamp.isofs
 
-$(ISO_REPOS_DIRSTAMP): $(ISO_PKGDIR)/APKINDEX.tar.gz
-	@touch $(ISO_PKGDIR)/../.boot_repository
-	@rm -f $(ISO_PKGDIR)/.SIGN.*
-	@touch $@
+# $(ISO_REPOS_DIRSTAMP): $(ISO_PKGDIR)/APKINDEX.tar.gz
+# 	@touch $(ISO_PKGDIR)/../.boot_repository
+# 	@rm -f $(ISO_PKGDIR)/.SIGN.*
+# 	@touch $@
 
-$(ISO_PKGDIR)/APKINDEX.tar.gz: $(PROFILE).packages
-	@echo "==> iso: generating repository"
-	mkdir -p "$(ISO_PKGDIR)"
-	sed -e 's/\#.*//' $< \
-		| xargs apk fetch $(APK_OPTS) \
-			--output $(ISO_PKGDIR) \
-			--recursive || { rm $(ISO_PKGDIR)/*.apk; exit 1; }
-	@apk index --description "$(ALPINE_NAME) $(ALPINE_RELEASE)" \
-		--rewrite-arch $(ALPINE_ARCH) -o $@ $(ISO_PKGDIR)/*.apk
-	@abuild-sign $@
+# $(ISO_PKGDIR)/APKINDEX.tar.gz: $(PROFILE).packages
+# 	@echo "==> iso: generating repository"
+# 	mkdir -p "$(ISO_PKGDIR)"
+# 	sed -e 's/\#.*//' $< \
+# 		| xargs apk fetch $(APK_OPTS) \
+# 			--output $(ISO_PKGDIR) \
+# 			--recursive || { rm $(ISO_PKGDIR)/*.apk; exit 1; }
+# 	@apk index --description "$(ALPINE_NAME) $(ALPINE_RELEASE)" \
+# 		--rewrite-arch $(ALPINE_ARCH) -o $@ $(ISO_PKGDIR)/*.apk
+# 	@abuild-sign $@
 
-repo: $(ISO_PKGDIR)/APKINDEX.tar.gz
+# repo: $(ISO_PKGDIR)/APKINDEX.tar.gz
 
 $(ISO_KERNEL_STAMP): $(MODLOOP_DIRSTAMP)
 	@echo "==> iso: install kernel $(CUR_KERNEL_PKGNAME)"
@@ -310,13 +344,18 @@ ALL_ISO_KERNEL = $(foreach flavor,$(KERNEL_FLAVOR),$(subst %,$(flavor),$(ISO_KER
 
 APKOVL_STAMP = $(DESTDIR)/stamp.isofs.apkovl
 
+# ISO_PKG_DEST	:= $(ISO_REPOS_DIRSTAMP)
+# ifdef BUILD_ROOTSQFS
+# 	ISO_PKG_DEST := $(ALL_ROOTSQFS)
+# endif
+
 $(APKOVL_STAMP):
 	@if [ "x$(APKOVL)" != "x" ]; then \
 		(cd $(ISO_DIR); wget $(APKOVL)); \
 	fi
 	@touch $@
 
-$(ISOFS_DIRSTAMP): $(ALL_MODLOOP) $(ALL_INITFS) $(ISO_REPOS_DIRSTAMP) $(ISOLINUX_BIN) $(ISOLINUX_C32) $(ALL_ISO_KERNEL) $(APKOVL_STAMP) $(SYSLINUX_CFG) $(APKOVL_DEST)
+$(ISOFS_DIRSTAMP): $(ALL_MODLOOP) $(ALL_INITFS) $(ROOTSQFS) $(ISOLINUX_BIN) $(ISOLINUX_C32) $(ALL_ISO_KERNEL) $(APKOVL_STAMP) $(SYSLINUX_CFG) $(APKOVL_DEST)
 	@echo "$(ALPINE_NAME)-$(ALPINE_RELEASE) $(BUILD_DATE)" \
 		> $(ISO_DIR)/.alpine-release
 	@touch $@
