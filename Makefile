@@ -109,7 +109,7 @@ $(MODLOOP_DIRSTAMP): $(MODLOOP_KERNELSTAMP)
 $(MODLOOP): $(MODLOOP_DIRSTAMP)
 	@echo "==> modloop: building image $(notdir $@)"
 	@mkdir -p $(dir $@)
-	@$(MKSQUASHFS) $(MODLOOP_DIR)/lib $@ -comp xz
+	@$(MKSQUASHFS) $(MODLOOP_DIR)/lib $@ -keep-as-directory -comp xz
 
 clean-modloop-%:
 	@rm -rf $(MODLOOP_DIR) $(subst %,$*,$(MODLOOP_DIRSTAMP) $(MODLOOP_KERNELSTAMP) $(MODLOOP))
