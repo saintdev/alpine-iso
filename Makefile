@@ -182,8 +182,15 @@ $(ROOTSQFS_DIRSTAMP): $(PROFILE).packages
 		--update \
 		--no-script \
 		--root $(ROOTSQFS_DIR) \
-		$(ROOTSQFS_PKGS)
+		apk-tools alpine-mirrors alpine-keys busybox
+	@cp /etc/apk/repositories $(ROOTSQFS_DIR)/etc/apk/repositories
+	@cp -L /etc/resolv.conf $(ROOTSQFS_DIR)/etc/resolv.conf
 	@chroot $(ROOTSQFS_DIR) /bin/busybox --install -s
+	@chroot $(ROOTSQFS_DIR) /sbin/apk add \
+		--initdb \
+		--update \
+		$(ROOTSQFS_PKGS)
+	@umount $(ROOTSQFS_DIR)/dev
 	@touch $@
 
 $(ROOTSQFS): $(ROOTSQFS_DIRSTAMP)
