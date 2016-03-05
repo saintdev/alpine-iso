@@ -183,6 +183,7 @@ $(ROOTSQFS_DIRSTAMP): $(PROFILE).packages
 		--no-script \
 		--root $(ROOTSQFS_DIR) \
 		$(ROOTSQFS_PKGS)
+	@chroot $(ROOTSQFS_DIR) /bin/busybox --install -s
 	@touch $@
 
 $(ROOTSQFS): $(ROOTSQFS_DIRSTAMP)
