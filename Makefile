@@ -165,7 +165,6 @@ clean-initfs: $(addprefix clean-initfs-,$(KERNEL_FLAVOR))
 ROOTSQFS	:= $(ISO_DIR)/boot/$(BUILD_ID).sqfs
 ROOTSQFS_DIR	 = $(DESTDIR)/rootsqfs.$(PROFILE)
 ROOTSQFS_DIRSTAMP := $(DESTDIR)/stamp.rootsqfs.$(PROFILE)
-ROOTSQFS_PKGS	:= alpine-base acct mdadm $(shell sed -e 's/\#.*//' ${PROFILE}.packages | xargs echo)
 
 # rootsqfs-%: $(ROOTSQFS)
 # 	@:
@@ -189,7 +188,7 @@ $(ROOTSQFS_DIRSTAMP): $(PROFILE).packages
 	@chroot $(ROOTSQFS_DIR) /sbin/apk add \
 		--initdb \
 		--update \
-		$(ROOTSQFS_PKGS)
+		$(APKS)
 	@umount $(ROOTSQFS_DIR)/dev
 	@touch $@
 
