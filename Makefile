@@ -175,21 +175,23 @@ rootsqfs: $(ROOTSQFS)
 
 $(ROOTSQFS_DIRSTAMP): $(PROFILE).packages
 	@rm -rf $(ROOTSQFS_DIR)
-	@mkdir -p $(ROOTSQFS_DIR)
+	@mkdir -p $(ROOTSQFS_DIR)/etc/apk
+	@cp -L /etc/resolv.conf $(ROOTSQFS_DIR)/etc/resolv.conf
+	@cp /etc/apk/repositories $(ROOTSQFS_DIR)/etc/apk/repositories
 	@apk add $(APK_OPTS) \
 		--initdb \
 		--update \
 		--no-script \
 		--root $(ROOTSQFS_DIR) \
-		apk-tools alpine-mirrors alpine-keys busybox
-	@cp /etc/apk/repositories $(ROOTSQFS_DIR)/etc/apk/repositories
-	@cp -L /etc/resolv.conf $(ROOTSQFS_DIR)/etc/resolv.conf
+		alpine-base
 	@chroot $(ROOTSQFS_DIR) /bin/busybox --install -s
-	@chroot $(ROOTSQFS_DIR) /sbin/apk add \
-		--initdb \
-		--update \
-		$(APKS)
-	@umount $(ROOTSQFS_DIR)/dev
+	@chroot $(ROOTSQFS_DIR) apk fix \
+		--depends \
+		--directory-permissions \
+		alpine-base
+	@chroot $(ROOTSQFS_DIR) apk add \
+		$(APKS) || return 0
+	@rm -f $(ROOTSQFS_DIR)/etc/resolv.conf
 	@touch $@
 
 $(ROOTSQFS): $(ROOTSQFS_DIRSTAMP)
